@@ -1,7 +1,8 @@
 #define MEMORY_MAX (1 << 16)
 #define R_COUNT 10
 #define PC_START 0x3000
+#include <cstdint>
 
-int mem_read(int input);
+uint16_t mem_read(uint16_t address);
 
-int sign_extend(int input, int bit_count);
+uint16_t sign_extend(uint16_t input, int bit_count);
