@@ -1,8 +1,9 @@
 #include "lc3.h"
+#include <cstdio>
+#include <cstdlib>
 
 // memory
-short memory[MEMORY_MAX]; 
-// short because lc3 has 16 bits
+int memory[MEMORY_MAX]; 
 // 2^16 mem locations - array will be 2^16
 
 // registers
@@ -19,7 +20,7 @@ enum {
     R_COND
 };
 
-short reg[R_COUNT];
+int reg[R_COUNT];
 
 // instruction set 
 enum {
@@ -53,11 +54,14 @@ int mem_read(int input) {
     return 0;
 }
 
+void mem_write(int address, int value) {
+    return;
+}
+
 int sign_extend(int input, int bit_count) {
     int last_bit = input >> (bit_count - 1) & 0x1;
-    int bit_mask = 0xFFFF << bit_count;
-    int sext_value;
     if (last_bit) {
+        int bit_mask = 0xFFFF << bit_count;
         return input | (bit_mask);
     }
     return input;
@@ -73,7 +77,7 @@ void update_flags(int output) {
     }
 }
 
-int add(int instr) {
+void add_fn(int instr) {
     // if bit 5 = 0: DR = SR1 + SR2
     // if bit 5 = 1: DR = SR1 + SEXT(IMM5)
 
@@ -91,8 +95,47 @@ int add(int instr) {
     update_flags(reg[DR_REG]);
 }
 
-int main(int argc, const char* argv[]) {
+void not_fn(int instr) {
+    int DR_REG = (instr >> 9) & 0x7;
+    int SR_REG = (instr >> 6) & 0x7;
 
+    reg[DR_REG] = reg[SR_REG] ^ 0xFFFF;
+    update_flags(reg[DR_REG]);
+}
+
+void ld_fn(int instr) {
+    int DR_REG = (instr >> 9) & 0x7;
+    int PCOFF9 = sign_extend(instr & 0x1FF, 9);
+    reg[DR_REG] = mem_read(reg[R_PC] + PCOFF9);
+    update_flags(reg[DR_REG]);
+}
+
+void st_fn(int instr) {
+    int SR_REG = (instr >> 9) & 0x7;
+    int PCOFF9 = sign_extend(instr & 0x1FF, 9);
+    mem_write(reg[R_PC] + PCOFF9, reg[SR_REG]);
+}
+
+void br_fn(int instr) {
+    int n = ((instr >> 11) & 0x1) && (reg[R_COND] == FL_NEG);
+    int z = (instr >> 10) & 0x1 && (reg[R_COND] == FL_ZER);
+    int p = (instr >> 9) & 0x1 && (reg[R_COND] == FL_POS);
+    
+    if (n || z || p) {
+        int PCOFF9 = sign_extend(instr & 0x1FF, 9);
+        reg[R_PC] = reg[R_PC] + PCOFF9;
+    }
+}
+
+void jsr_fn(int instr) {
+    int PCOFF11 = instr & 0x7FF;
+    reg[R7] = reg[R_PC];
+    reg[R_PC] = reg[R_PC] + sign_extend(PCOFF11, 11);
+
+}
+
+int main(int argc, const char* argv[]) {
+    
     reg[R_COND] = FL_ZER;
 
     reg[R_PC] = PC_START;
@@ -105,10 +148,23 @@ int main(int argc, const char* argv[]) {
 
         switch (op) {
             case OP_ADD:
-                add(instr);
+                add_fn(instr);
                 break;
-            case OP_AND:
-                
+            case OP_NOT:
+                not_fn(instr);
+                break;
+            case OP_LD:
+                ld_fn(instr);
+                break;
+            case OP_ST:
+                st_fn(instr);
+                break;
+            case OP_BR:
+                br_fn(instr);
+                break;
+            case OP_JSR:
+                jsr_fn(instr);
+                break;
         }
     }
 
