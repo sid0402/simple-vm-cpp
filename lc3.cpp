@@ -1,165 +1,16 @@
 #include "lc3.h"
+#include "instructions.h"
+#include "utils.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 
-
-// memory
-uint16_t memory[MEMORY_MAX];
-// 2^16 memory locations
-
-
-// registers
-enum {
-    R0,
-    R1,
-    R2,
-    R3,
-    R4,
-    R5,
-    R6,
-    R7,
-    R_PC,
-    R_COND
-};
-
 uint16_t reg[R_COUNT];
-
-
-// instruction set
-enum {
-    OP_BR   = 0x0,
-    OP_ADD  = 0x1,
-    OP_LD   = 0x2,
-    OP_ST   = 0x3,
-    OP_JSR  = 0x4,
-    OP_AND  = 0x5,
-    OP_LDR  = 0x6,
-    OP_STR  = 0x7,
-    OP_RTI  = 0x8,
-    OP_NOT  = 0x9,
-    OP_LDI  = 0xA,
-    OP_STI  = 0xB,
-    OP_JMP  = 0xC,
-    OP_RES  = 0xD,
-    OP_LEA  = 0xE,
-    OP_TRAP = 0xF
-};
-
-
-// condition flags
-enum {
-    FL_POS = 1 << 0,
-    FL_ZER = 1 << 1,
-    FL_NEG = 1 << 2,
-};
-
-
-uint16_t mem_read(uint16_t address) {
-    return memory[address];
-}
-
-
-void mem_write(uint16_t address, uint16_t value) {
-    memory[address] = value;
-}
-
-
-uint16_t sign_extend(uint16_t input, int bit_count) {
-    int last_bit = (input >> (bit_count - 1)) & 0x1;
-
-    if (last_bit) {
-        uint16_t bit_mask = 0xFFFF << bit_count;
-        return input | bit_mask;
-    }
-
-    return input;
-}
-
-
-void update_flags(uint16_t output) {
-    if (output == 0) {
-        reg[R_COND] = FL_ZER;
-    } else if ((output >> 15) & 0x1) {
-        reg[R_COND] = FL_NEG;
-    } else {
-        reg[R_COND] = FL_POS;
-    }
-}
-
-
-void add_fn(uint16_t instr) {
-    // if bit 5 = 0: DR = SR1 + SR2
-    // if bit 5 = 1: DR = SR1 + SEXT(IMM5)
-
-    int bit5 = (instr >> 5) & 0x1;
-    int DR_REG = (instr >> 9) & 0x7;
-    int SR1_REG = (instr >> 6) & 0x7;
-
-    if (bit5) {
-        uint16_t imm5 = instr & 0x1F;
-        reg[DR_REG] = reg[SR1_REG] + sign_extend(imm5, 5);
-    } else {
-        int SR2_REG = instr & 0x7;
-        reg[DR_REG] = reg[SR1_REG] + reg[SR2_REG];
-    }
-
-    update_flags(reg[DR_REG]);
-}
-
-
-void not_fn(uint16_t instr) {
-    int DR_REG = (instr >> 9) & 0x7;
-    int SR_REG = (instr >> 6) & 0x7;
-
-    reg[DR_REG] = reg[SR_REG] ^ 0xFFFF;
-
-    update_flags(reg[DR_REG]);
-}
-
-
-void ld_fn(uint16_t instr) {
-    int DR_REG = (instr >> 9) & 0x7;
-    uint16_t PCOFF9 = sign_extend(instr & 0x1FF, 9);
-
-    reg[DR_REG] = mem_read(reg[R_PC] + PCOFF9);
-
-    update_flags(reg[DR_REG]);
-}
-
-
-void st_fn(uint16_t instr) {
-    int SR_REG = (instr >> 9) & 0x7;
-    uint16_t PCOFF9 = sign_extend(instr & 0x1FF, 9);
-
-    mem_write(reg[R_PC] + PCOFF9, reg[SR_REG]);
-}
-
-
-void br_fn(uint16_t instr) {
-    int n = ((instr >> 11) & 0x1) && (reg[R_COND] == FL_NEG);
-    int z = ((instr >> 10) & 0x1) && (reg[R_COND] == FL_ZER);
-    int p = ((instr >> 9) & 0x1) && (reg[R_COND] == FL_POS);
-
-    if (n || z || p) {
-        uint16_t PCOFF9 = sign_extend(instr & 0x1FF, 9);
-        reg[R_PC] = reg[R_PC] + PCOFF9;
-    }
-}
-
-
-void jsr_fn(uint16_t instr) {
-    uint16_t PCOFF11 = instr & 0x7FF;
-
-    reg[R7] = reg[R_PC];
-    reg[R_PC] = reg[R_PC] + sign_extend(PCOFF11, 11);
-}
-
+uint16_t memory[MEMORY_MAX];
 
 uint16_t swap16(uint16_t x) {
     return (x << 8) | (x >> 8);
 }
-
 
 void read_image_file(FILE* file) {
     // origin tells us where in memory to place the image
@@ -222,32 +73,32 @@ int main(int argc, const char* argv[]) {
 
     while (running) {
 
-        uint16_t instr = mem_read(reg[R_PC]++);
+        uint16_t instr = mem_read(reg[R_PC]++, memory);
         int op = (instr >> 12) & 0xF;
 
         switch (op) {
             case OP_ADD:
-                add_fn(instr);
+                add_fn(instr, reg);
                 break;
 
             case OP_NOT:
-                not_fn(instr);
+                not_fn(instr, reg);
                 break;
 
             case OP_LD:
-                ld_fn(instr);
+                ld_fn(instr, reg, memory);
                 break;
 
             case OP_ST:
-                st_fn(instr);
+                st_fn(instr, reg, memory);
                 break;
 
             case OP_BR:
-                br_fn(instr);
+                br_fn(instr, reg);
                 break;
 
             case OP_JSR:
-                jsr_fn(instr);
+                jsr_fn(instr, reg);
                 break;
 
             case OP_TRAP:
