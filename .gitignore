@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Local editor settings
+.vscode/
+
+# C/C++ build artifacts
+/lc3
+*.o
+*.out
+*.dSYM/
+build/

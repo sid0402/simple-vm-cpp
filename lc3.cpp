@@ -77,12 +77,12 @@ int main(int argc, const char* argv[]) {
         int op = (instr >> 12) & 0xF;
 
         switch (op) {
-            case OP_ADD:
-                add_fn(instr, reg);
+            case OP_BR:
+                br_fn(instr, reg);
                 break;
 
-            case OP_NOT:
-                not_fn(instr, reg);
+            case OP_ADD:
+                add_fn(instr, reg);
                 break;
 
             case OP_LD:
@@ -93,19 +93,54 @@ int main(int argc, const char* argv[]) {
                 st_fn(instr, reg, memory);
                 break;
 
-            case OP_BR:
-                br_fn(instr, reg);
-                break;
-
             case OP_JSR:
                 jsr_fn(instr, reg);
                 break;
 
+            case OP_AND:
+                and_fn(instr, reg);
+                break;
+
+            case OP_LDR:
+                ldr_fn(instr, reg, memory);
+                break;
+
+            case OP_STR:
+                str_fn(instr, reg, memory);
+                break;
+
+            case OP_NOT:
+                not_fn(instr, reg);
+                break;
+
+            case OP_LDI:
+                ldi_fn(instr, reg, memory);
+                break;
+
+            case OP_STI:
+                sti_fn(instr, reg, memory);
+                break;
+
+            case OP_JMP:
+                jmp_fn(instr, reg);
+                break;
+
+            case OP_LEA:
+                lea_fn(instr, reg);
+                break;
+
             case OP_TRAP:
+                trap_fn(instr, reg, memory);
                 if ((instr & 0xFF) == 0x25) {
                     running = 0;
                 }
                 break;
+
+            case OP_RES:
+            case OP_RTI:
+            default:
+                fprintf(stderr, "bad opcode: 0x%04X\n", instr);
+                return EXIT_FAILURE;
         }
     }
 }
