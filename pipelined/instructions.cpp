@@ -4,7 +4,7 @@
 namespace {
 
 uint16_t sign_extend(uint16_t input, uint16_t bit_count) {
-    const uint16_t value_mask = (1u << bit_count) - 1;
+    uint16_t value_mask = (1u << bit_count) - 1;
     input &= value_mask;
 
     if ((input >> (bit_count - 1)) & 0x1) {

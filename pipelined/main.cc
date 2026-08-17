@@ -5,36 +5,34 @@
 uint16_t reg[R_COUNT];
 uint16_t memory[MEMORY_MAX];
 uint16_t R_PC = PC_START;
-uint16_t R_CC;
+uint16_t R_CC = FL_ZER;
 
 IFID currIFID;
-IFID nextIFID;
-
 IDEX currIDEX;
-IDEX nextIDEX;
-
 EXMEM currEXMEM;
-EXMEM nextEXMEM;
-
 MEMWB currMEMWB;
-MEMWB nextMEMWB;
 
 int clock_cycles = 0;
 
 int main() {
+    reg[R0] = 7;
+    memory[PC_START] = 0x1425; // ADD R2, R0, #5
 
-    while (true) {
+    while (clock_cycles < 5) {
+
+        IFID nextIFID{};
+        IDEX nextIDEX{};
+        EXMEM nextEXMEM{};
+        MEMWB nextMEMWB{};
 
         // FETCH
-        uint16_t instr = mem_read(memory, R_PC);
+        const uint16_t instr = mem_read(memory, R_PC);
         R_PC++;
         nextIFID.valid = true;
         nextIFID.instruction = instr;
         nextIFID.PC_PLUS_ONE = R_PC;
 
         // DECODE
-        nextIDEX = {};
-
         if (currIFID.valid) {
             const decoded_instruction decoded =
                 decode_instruction(currIFID.instruction);
@@ -65,7 +63,54 @@ int main() {
             nextIDEX.CC_WRITE = decode_controls.CC_WRITE;
         }
 
-        
+        // EXECUTE
+        if (currIDEX.valid) {
+            const uint16_t second_operand =
+                currIDEX.alu_input == ALU_INPUT::IMM
+                    ? currIDEX.offset
+                    : currIDEX.SR2_VAL;
+            const uint16_t ALU_RESULT =
+                alu(currIDEX.alu_op, currIDEX.SR1_VAL, second_operand);
+            nextEXMEM.valid = true;
+            nextEXMEM.DR = currIDEX.DR;
+            nextEXMEM.ALU_RESULT = ALU_RESULT;
+            nextEXMEM.PC_PLUS_ONE = currIDEX.PC_PLUS_ONE;
+            //nextEXMEM.STORE_DATA = currIDEX.S
+            nextEXMEM.pc_op = currIDEX.pc_op;
+            nextEXMEM.wb_op = currIDEX.wb_op;
+            nextEXMEM.REG_WRITE = currIDEX.REG_WRITE;
+            nextEXMEM.MEM_READ = currIDEX.MEM_READ;
+            nextEXMEM.MEM_WRITE = currIDEX.MEM_WRITE;
+            nextEXMEM.CC_WRITE = currIDEX.CC_WRITE;
+        }
+
+        // MEMORY
+        if (currEXMEM.valid) {
+            nextMEMWB.valid = true;
+            nextMEMWB.ALU_RESULT = currEXMEM.ALU_RESULT;
+            nextMEMWB.PC_PLUS_ONE = currEXMEM.PC_PLUS_ONE;
+            nextMEMWB.DR = currEXMEM.DR;
+            nextMEMWB.CC_WRITE = currEXMEM.CC_WRITE;
+            nextMEMWB.REG_WRITE = currEXMEM.REG_WRITE;
+        }
+
+        //WRITEBACK
+        if (currMEMWB.valid) {
+            if (currMEMWB.REG_WRITE) {
+                reg_write(reg, currMEMWB.DR, currMEMWB.ALU_RESULT);
+            }
+            if (currMEMWB.CC_WRITE) {
+                update_cc(currMEMWB.ALU_RESULT, &R_CC);
+            }
+        }
+
+        // CLOCK CYCLE
+        currIFID = nextIFID;
+        currIDEX = nextIDEX;
+        currEXMEM = nextEXMEM;
+        currMEMWB = nextMEMWB;
+        clock_cycles++;
+
     };
 
 }
