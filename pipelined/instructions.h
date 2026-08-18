@@ -29,8 +29,10 @@ struct decoded_instruction {
     uint16_t src2;
     uint16_t dest;
     uint16_t immediate;
+    uint16_t condition_mask;
     bool uses_src1;
     bool uses_src2;
+    bool halt;
 };
 
 decoded_instruction decode_instruction(uint16_t instruction);

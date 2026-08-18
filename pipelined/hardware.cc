@@ -34,6 +34,8 @@ uint16_t alu(ALU_OPERATION alu_op, uint16_t src1, uint16_t src2) {
         return src1 & src2;
     } else if (alu_op == ALU_OPERATION::NOT) {
         return src1 ^ 0xFFFF;
+    } else if (alu_op == ALU_OPERATION::PASS) {
+        return src1;
     } else {
         return 0; // interrupt
     }

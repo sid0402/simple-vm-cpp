@@ -32,6 +32,7 @@ struct IFID {
 
 struct IDEX {
     bool valid;
+    bool halt;
     uint16_t PC_PLUS_ONE;
     uint16_t op;
     uint16_t SR1;
@@ -42,6 +43,7 @@ struct IDEX {
     bool USE_SR2;
     uint16_t DR;
     uint16_t offset;
+    uint16_t condition_mask;
 
     ALU_OPERATION alu_op;
     ALU_A_INPUT alu_a_input;
@@ -56,6 +58,7 @@ struct IDEX {
 
 struct EXMEM {
     bool valid;
+    bool halt;
     uint16_t DR;
     uint16_t ALU_RESULT;
     uint16_t PC_PLUS_ONE;
@@ -72,6 +75,7 @@ struct EXMEM {
 
 struct MEMWB {
     bool valid;
+    bool halt;
     uint16_t WRITEBACK_VALUE;
     uint16_t PC_PLUS_ONE;
     uint16_t DR;

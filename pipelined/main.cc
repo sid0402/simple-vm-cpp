@@ -17,8 +17,12 @@ int clock_cycles = 0;
 int main() {
     reg[R0] = 7;
     memory[PC_START] = 0x1425; // ADD R2, R0, #5
+    memory[PC_START + 1] = 0xF025; // TRAP x25
 
-    while (clock_cycles < 5) {
+    bool fetch_enabled = true;
+    bool running = true;
+
+    while (running) {
 
         IFID nextIFID{};
         IDEX nextIDEX{};
@@ -26,11 +30,13 @@ int main() {
         MEMWB nextMEMWB{};
 
         // FETCH
-        const uint16_t instr = mem_read(memory, R_PC);
-        R_PC++;
-        nextIFID.valid = true;
-        nextIFID.instruction = instr;
-        nextIFID.PC_PLUS_ONE = R_PC;
+        if (fetch_enabled) {
+            const uint16_t instr = mem_read(memory, R_PC);
+            R_PC++;
+            nextIFID.valid = true;
+            nextIFID.instruction = instr;
+            nextIFID.PC_PLUS_ONE = R_PC;
+        }
 
         // DECODE
         if (currIFID.valid) {
@@ -39,6 +45,7 @@ int main() {
             const controls& decode_controls = decoded.control;
 
             nextIDEX.valid = true;
+            nextIDEX.halt = decoded.halt;
             nextIDEX.PC_PLUS_ONE = currIFID.PC_PLUS_ONE;
             nextIDEX.op = decoded.opcode;
             nextIDEX.SR1 = decoded.src1;
@@ -53,6 +60,7 @@ int main() {
                 : 0;
             nextIDEX.DR = decoded.dest;
             nextIDEX.offset = decoded.immediate;
+            nextIDEX.condition_mask = decoded.condition_mask;
             nextIDEX.alu_op = decode_controls.alu_op;
             nextIDEX.alu_a_input = decode_controls.alu_a_input;
             nextIDEX.alu_b_input = decode_controls.alu_b_input;
@@ -77,6 +85,7 @@ int main() {
             const uint16_t ALU_RESULT =
                 alu(currIDEX.alu_op, first_operand, second_operand);
             nextEXMEM.valid = true;
+            nextEXMEM.halt = currIDEX.halt;
             nextEXMEM.DR = currIDEX.DR;
             nextEXMEM.ALU_RESULT = ALU_RESULT;
             nextEXMEM.PC_PLUS_ONE = currIDEX.PC_PLUS_ONE;
@@ -87,6 +96,27 @@ int main() {
             nextEXMEM.MEM_READ = currIDEX.MEM_READ;
             nextEXMEM.MEM_WRITE = currIDEX.MEM_WRITE;
             nextEXMEM.CC_WRITE = currIDEX.CC_WRITE;
+
+            if (currIDEX.pc_op == PC_OP::JMP ||
+                currIDEX.pc_op == PC_OP::SUB) {
+                R_PC = ALU_RESULT;
+                nextIFID = {};
+                nextIDEX = {};
+            }
+
+            if (currIDEX.pc_op == PC_OP::BRANCH &&
+                (currIDEX.condition_mask & R_CC) != 0) {
+                R_PC = ALU_RESULT;
+                nextIFID = {};
+                nextIDEX = {};
+            }
+
+            if (currIDEX.halt) {
+                fetch_enabled = false;
+                R_PC = currIDEX.PC_PLUS_ONE;
+                nextIFID = {};
+                nextIDEX = {};
+            }
         }
 
         // MEMORY
@@ -100,6 +130,7 @@ int main() {
             }
 
             nextMEMWB.valid = true;
+            nextMEMWB.halt = currEXMEM.halt;
             switch (currEXMEM.wb_op) {
                 case WB_OP::ALU:
                     nextMEMWB.WRITEBACK_VALUE = currEXMEM.ALU_RESULT;
@@ -124,6 +155,9 @@ int main() {
             }
             if (currMEMWB.CC_WRITE) {
                 update_cc(currMEMWB.WRITEBACK_VALUE, &R_CC);
+            }
+            if (currMEMWB.halt) {
+                running = false;
             }
         }
 
