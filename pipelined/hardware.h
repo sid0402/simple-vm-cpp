@@ -44,7 +44,8 @@ struct IDEX {
     uint16_t offset;
 
     ALU_OPERATION alu_op;
-    ALU_INPUT alu_input;
+    ALU_A_INPUT alu_a_input;
+    ALU_B_INPUT alu_b_input;
     PC_OP pc_op;
     WB_OP wb_op;
     bool REG_WRITE;
@@ -71,7 +72,7 @@ struct EXMEM {
 
 struct MEMWB {
     bool valid;
-    uint16_t ALU_RESULT;
+    uint16_t WRITEBACK_VALUE;
     uint16_t PC_PLUS_ONE;
     uint16_t DR;
     bool CC_WRITE;

@@ -54,7 +54,8 @@ int main() {
             nextIDEX.DR = decoded.dest;
             nextIDEX.offset = decoded.immediate;
             nextIDEX.alu_op = decode_controls.alu_op;
-            nextIDEX.alu_input = decode_controls.alu_input;
+            nextIDEX.alu_a_input = decode_controls.alu_a_input;
+            nextIDEX.alu_b_input = decode_controls.alu_b_input;
             nextIDEX.pc_op = decode_controls.pc_op;
             nextIDEX.wb_op = decode_controls.wb_op;
             nextIDEX.REG_WRITE = decode_controls.REG_WRITE;
@@ -65,17 +66,21 @@ int main() {
 
         // EXECUTE
         if (currIDEX.valid) {
+            const uint16_t first_operand =
+                currIDEX.alu_a_input == ALU_A_INPUT::PC_PLUS_ONE
+                    ? currIDEX.PC_PLUS_ONE
+                    : currIDEX.SR1_VAL;
             const uint16_t second_operand =
-                currIDEX.alu_input == ALU_INPUT::IMM
+                currIDEX.alu_b_input == ALU_B_INPUT::IMM
                     ? currIDEX.offset
                     : currIDEX.SR2_VAL;
             const uint16_t ALU_RESULT =
-                alu(currIDEX.alu_op, currIDEX.SR1_VAL, second_operand);
+                alu(currIDEX.alu_op, first_operand, second_operand);
             nextEXMEM.valid = true;
             nextEXMEM.DR = currIDEX.DR;
             nextEXMEM.ALU_RESULT = ALU_RESULT;
             nextEXMEM.PC_PLUS_ONE = currIDEX.PC_PLUS_ONE;
-            //nextEXMEM.STORE_DATA = currIDEX.S
+            nextEXMEM.STORE_DATA = currIDEX.SR2_VAL;
             nextEXMEM.pc_op = currIDEX.pc_op;
             nextEXMEM.wb_op = currIDEX.wb_op;
             nextEXMEM.REG_WRITE = currIDEX.REG_WRITE;
@@ -86,8 +91,26 @@ int main() {
 
         // MEMORY
         if (currEXMEM.valid) {
+            uint16_t memory_data = 0;
+            if (currEXMEM.MEM_READ) {
+                memory_data = mem_read(memory, currEXMEM.ALU_RESULT);
+            }
+            if (currEXMEM.MEM_WRITE) {
+                mem_write(memory, currEXMEM.ALU_RESULT, currEXMEM.STORE_DATA);
+            }
+
             nextMEMWB.valid = true;
-            nextMEMWB.ALU_RESULT = currEXMEM.ALU_RESULT;
+            switch (currEXMEM.wb_op) {
+                case WB_OP::ALU:
+                    nextMEMWB.WRITEBACK_VALUE = currEXMEM.ALU_RESULT;
+                    break;
+                case WB_OP::MEM:
+                    nextMEMWB.WRITEBACK_VALUE = memory_data;
+                    break;
+                case WB_OP::PC:
+                    nextMEMWB.WRITEBACK_VALUE = currEXMEM.PC_PLUS_ONE;
+                    break;
+            }
             nextMEMWB.PC_PLUS_ONE = currEXMEM.PC_PLUS_ONE;
             nextMEMWB.DR = currEXMEM.DR;
             nextMEMWB.CC_WRITE = currEXMEM.CC_WRITE;
@@ -97,10 +120,10 @@ int main() {
         //WRITEBACK
         if (currMEMWB.valid) {
             if (currMEMWB.REG_WRITE) {
-                reg_write(reg, currMEMWB.DR, currMEMWB.ALU_RESULT);
+                reg_write(reg, currMEMWB.DR, currMEMWB.WRITEBACK_VALUE);
             }
             if (currMEMWB.CC_WRITE) {
-                update_cc(currMEMWB.ALU_RESULT, &R_CC);
+                update_cc(currMEMWB.WRITEBACK_VALUE, &R_CC);
             }
         }
 

@@ -22,7 +22,8 @@ decoded_instruction decode_instruction(uint16_t instruction) {
     decoded_instruction decoded{
         {
             ALU_OPERATION::PASS,
-            ALU_INPUT::REG,
+            ALU_A_INPUT::SRC1,
+            ALU_B_INPUT::SRC2,
             IMMEDIATE_FORMAT::NONE,
             PC_OP::SEQ,
             WB_OP::ALU,
@@ -52,10 +53,10 @@ decoded_instruction decode_instruction(uint16_t instruction) {
             if (uses_immediate) {
                 decoded.immediate = sign_extend(instruction & 0x1F, 5);
                 decoded.control.immediate_format = IMMEDIATE_FORMAT::IMM5;
-                decoded.control.alu_input = ALU_INPUT::IMM;
+                decoded.control.alu_b_input = ALU_B_INPUT::IMM;
             } else {
                 decoded.src2 = instruction & 0x7;
-                decoded.control.alu_input = ALU_INPUT::REG;
+                decoded.control.alu_b_input = ALU_B_INPUT::SRC2;
             }
 
             decoded.control.alu_op = ALU_OPERATION::ADD;
@@ -75,10 +76,10 @@ decoded_instruction decode_instruction(uint16_t instruction) {
             if (uses_immediate) {
                 decoded.immediate = sign_extend(instruction & 0x1F, 5);
                 decoded.control.immediate_format = IMMEDIATE_FORMAT::IMM5;
-                decoded.control.alu_input = ALU_INPUT::IMM;
+                decoded.control.alu_b_input = ALU_B_INPUT::IMM;
             } else {
                 decoded.src2 = instruction & 0x7;
-                decoded.control.alu_input = ALU_INPUT::REG;
+                decoded.control.alu_b_input = ALU_B_INPUT::SRC2;
             }
 
             decoded.control.alu_op = ALU_OPERATION::AND;
@@ -87,12 +88,54 @@ decoded_instruction decode_instruction(uint16_t instruction) {
             break;
         }
 
+        case OP_LDR:
+            decoded.src1 = (instruction >> 6) & 0x7;
+            decoded.dest = (instruction >> 9) & 0x7;
+            decoded.immediate = sign_extend(instruction & 0x3F, 6);
+            decoded.uses_src1 = true;
+            decoded.uses_src2 = false;
+            decoded.control.alu_op = ALU_OPERATION::ADD;
+            decoded.control.alu_a_input = ALU_A_INPUT::SRC1;
+            decoded.control.alu_b_input = ALU_B_INPUT::IMM;
+            decoded.control.immediate_format = IMMEDIATE_FORMAT::OFFSET6;
+            decoded.control.wb_op = WB_OP::MEM;
+            decoded.control.REG_WRITE = true;
+            decoded.control.MEM_READ = true;
+            decoded.control.CC_WRITE = true;
+            break;
+
+        case OP_STR:
+            decoded.src1 = (instruction >> 6) & 0x7;
+            decoded.src2 = (instruction >> 9) & 0x7;
+            decoded.immediate = sign_extend(instruction & 0x3F, 6);
+            decoded.uses_src1 = true;
+            decoded.uses_src2 = true;
+            decoded.control.alu_op = ALU_OPERATION::ADD;
+            decoded.control.alu_a_input = ALU_A_INPUT::SRC1;
+            decoded.control.alu_b_input = ALU_B_INPUT::IMM;
+            decoded.control.immediate_format = IMMEDIATE_FORMAT::OFFSET6;
+            decoded.control.MEM_WRITE = true;
+            break;
+
         case OP_NOT:
             decoded.src1 = (instruction >> 6) & 0x7;
             decoded.dest = (instruction >> 9) & 0x7;
             decoded.uses_src1 = true;
             decoded.uses_src2 = false;
             decoded.control.alu_op = ALU_OPERATION::NOT;
+            decoded.control.REG_WRITE = true;
+            decoded.control.CC_WRITE = true;
+            break;
+
+        case OP_LEA:
+            decoded.dest = (instruction >> 9) & 0x7;
+            decoded.immediate = sign_extend(instruction & 0x1FF, 9);
+            decoded.uses_src1 = false;
+            decoded.uses_src2 = false;
+            decoded.control.alu_op = ALU_OPERATION::ADD;
+            decoded.control.alu_a_input = ALU_A_INPUT::PC_PLUS_ONE;
+            decoded.control.alu_b_input = ALU_B_INPUT::IMM;
+            decoded.control.immediate_format = IMMEDIATE_FORMAT::OFFSET9;
             decoded.control.REG_WRITE = true;
             decoded.control.CC_WRITE = true;
             break;

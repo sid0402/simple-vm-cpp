@@ -7,8 +7,13 @@ enum class ALU_OPERATION {
     PASS
 };
 
-enum class ALU_INPUT {
-    REG,
+enum class ALU_A_INPUT {
+    SRC1,
+    PC_PLUS_ONE
+};
+
+enum class ALU_B_INPUT {
+    SRC2,
     IMM
 };
 
@@ -44,7 +49,8 @@ enum class WB_OP {
 
 struct controls {
     ALU_OPERATION alu_op;
-    ALU_INPUT alu_input;
+    ALU_A_INPUT alu_a_input;
+    ALU_B_INPUT alu_b_input;
     IMMEDIATE_FORMAT immediate_format;
     PC_OP pc_op;
     WB_OP wb_op;
